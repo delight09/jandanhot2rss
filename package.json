@@ -1,0 +1,15 @@
+{
+    "name": "jandan-hot-to-rss",
+    "scripts": {
+        "start": "node parse_xml.js"
+    },
+    "engines": {
+        "node": "*"
+    },
+    "dependencies": {
+        "request": "latest",
+        "express": "latest",
+        "htmlparser2": "latest",
+        "feed": "latest",
+    }
+}
