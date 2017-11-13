@@ -22,6 +22,7 @@ var feed = '';
 var arr_feed_structure = [];
 // var limit_article_length = 300; // using 99999 instead, for full article in feed
 var limit_article_length = 99999; // for full article feed, using 99999 instead TODO delete
+var xml_entry_footer='<hr /><strong>使用经BSD许可证分发的<a href="https://github.com/delight09/jandanhot2rss">jandanhot2rss</a>项目生成，<a href="https://blog.djh.im/">imdjh</a>提供支援维护</strong>'
 
 
 // http Server
@@ -150,12 +151,8 @@ function buildFeed() {
         id: 'http://jandan.net/',
         link: 'http://jandan.net/',
         favicon: 'http://cdn.jandan.net/static/img/favicon.ico',
-        copyright: 'Copyleft under BSD licenses 2017, delight09@github',
-        generator: 'https://github.com/delight09/jandanhot2rss',
-        feedLinks: {
-            json: 'https://go.djh.im/jandan-hot.json',
-            atom: 'https://go.djh.im/jandan-hot.atom'
-        }
+        copyright: 'Copycenter under BSD licenses 2017, delight09@github',
+        generator: 'https://github.com/delight09/jandanhot2rss'
     });
     feed.addContributor({
         name: 'delight09',
@@ -167,7 +164,9 @@ function buildFeed() {
         let _arr_date = [];
         _arr_date = jandan_datestring.match(/^\s*@\s*(\d+).(\d+).(\d+)\s*,\s*(\d+):(\d+)\s*/);
 
-        return new Date(_arr_date[1], _arr_date[2], _arr_date[3], _arr_date[4], _arr_date[5]);
+        return new Date(_arr_date[1], (_arr_date[2] - 1), _arr_date[3], _arr_date[4], _arr_date[5]);
+        // month is 0-based, refer:
+        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date
     }
 
     function jandanAuthorURLHelper(url) {
@@ -183,7 +182,7 @@ function buildFeed() {
             id: e.url,
             link: e.url,
             description: '煎蛋最热文章 - ' + _date_generate,
-            content: e.content,
+            content: e.content + xml_entry_footer,
             author: [{
                 name: e.author_name,
                 link: jandanAuthorURLHelper(e.author_url)
@@ -273,11 +272,14 @@ var getArticleJSON = function(given_index, callback) {
 
             while ((!isEndOfPost(_dom_curr)) && _count_content_length < limit_article_length) {
                 _t = domUtils.getInnerHTML(_dom_curr).trim();
-                _xml_content += _t;
+                _xml_content += _t + '<br />'; // carriage return after per tag
                 _count_content_length += _t.length;
 
                 _dom_curr = _dom_curr.next;
             }
+
+            _xml_content = _xml_content.replace(/data-original=/g, 'src='); // remove lazy load feature
+
 		arr_feed_structure[given_index].author_url = _str_author_url;
 		arr_feed_structure[given_index].author_name = _str_author_name;
 		arr_feed_structure[given_index].timestamp = _str_author_ts;
