@@ -1,7 +1,7 @@
 {
     "name": "jandan-hot-to-rss",
     "scripts": {
-        "start": "node parse_xml.js"
+        "start": "node app.js"
     },
     "engines": {
         "node": "*"
