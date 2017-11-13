@@ -10,6 +10,6 @@
         "request": "latest",
         "express": "latest",
         "htmlparser2": "latest",
-        "feed": "latest",
+        "feed": "latest"
     }
 }
