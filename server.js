@@ -26,6 +26,10 @@ var xml_entry_footer='<hr /><strong>使用经BSD许可证分发的<a href="https
 
 
 // http Server
+app.get('/', function(req, res) {
+            res.send('Have a nice day ;)');
+            res.end();
+});
 app.get('/feed.xml', function(req, res) {
     work_hard(function() {
         if (feed) {
