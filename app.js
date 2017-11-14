@@ -6,23 +6,23 @@ var request = require('./node_modules/request');
 var Feed = require('./node_modules/feed');
 var express = require('./node_modules/express');
 var htmlparser2 = require('./node_modules/htmlparser2');
-var domUtils = htmlparser2.DomUtils;
 
-// call options
+// options to play around
 var reqHeaders = {
     "User-Agent": "Moeela/5.0 (X1337; Wonders x86_64) AppleWebKit/666 (KHTML, like Gecko) Chrome/666 Safari/666",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8"
 };
 var api_getHotTopic = "http://jandan.net/2010/06/24/feedsky-feed.html";
+var limit_article_length = 300; // using 99999 instead, for full article in feed
+var xml_entry_footer = '<hr /><strong>使用经BSD许可证分发的<a href="https://github.com/delight09/jandanhot2rss">jandanhot2rss</a>项目生成，<a href="https://blog.djh.im/">imdjh</a>用❤支援维护</strong>'
+var obj_contributor = { "name": "delight09", "url": "https://github.com/delight09", "contact": "https://github.com/delight09/jandanhot2rss" }
 
 // global variables
 var app = express();
+var domUtils = htmlparser2.DomUtils;
 var raw_JSONP = '';
-var feed = '';
+var feed = {};
 var arr_feed_structure = [];
-// var limit_article_length = 300; // using 99999 instead, for full article in feed
-var limit_article_length = 99999; // for full article feed, using 99999 instead TODO delete
-var xml_entry_footer='<hr /><strong>使用经BSD许可证分发的<a href="https://github.com/delight09/jandanhot2rss">jandanhot2rss</a>项目生成，<a href="https://blog.djh.im/">imdjh</a>提供支援维护</strong>'
 
 
 // http Server
@@ -31,19 +31,23 @@ app.get('/feed.xml', function(req, res) {
         if (feed) {
             if (req.query.type) {
                 if (req.query.type == 'rss') {
+			res.type('application/rss+xml');
                     res.send(feed.rss2());
                 }
                 if (req.query.type == 'json') {
+			res.type('application/json');
                     res.send(feed.json1());
                 } else {
+			res.type('application/atom+xml');
                     res.send(feed.atom1());
                 }
             } else {
+		    res.type('application/atom+xml');
                 res.send(feed.atom1());
             }
             res.end();
         } else {
-            res.send('Please submit an issue at delight09/jandanhot2rss on github.')
+            res.send('API parse failure, please consider contact contributor: ' + obj_contributor.contact);
         }
     });
 
@@ -129,7 +133,14 @@ function getFeedStructure(data) {
 }
 
 var getFeedEntry = function (origin_callback) {
-	let requests = [0,1,2,3,4,5,6,7,8,9].map((index) => { //TODO arrary is MAGIC
+	let _arr_structure_seq = [];
+	let i = 0;
+
+for (i = 0; i < arr_feed_structure.length; i++) {
+   _arr_structure_seq.push(i);
+}
+
+	let requests = _arr_structure_seq.map((index) => {
             return new Promise((resolve) => {
                 getArticleJSON(index, resolve);
             });
@@ -146,19 +157,19 @@ function buildFeed() {
 	data = arr_feed_structure;
     // build feed header
     let feed = new Feed({
-        title: '煎蛋 - 24H最热',
-        description: 'Power by jandanhot2rss',
+        title: '煎蛋 - 24H最热', // TODO
+        description: '地球上没有新鲜事 | 第三方订阅源 由jandanhot2rss强力驱动',
         id: 'http://jandan.net/',
         link: 'http://jandan.net/',
         favicon: 'http://cdn.jandan.net/static/img/favicon.ico',
-        copyright: 'Copycenter under BSD licenses 2017, delight09@github',
+        copyright: 'Copycenter under BSD licenses 2017, ' + obj_contributor.name,
         generator: 'https://github.com/delight09/jandanhot2rss'
     });
     feed.addContributor({
-        name: 'delight09',
-        link: 'https://github.com/delight09'
+        name: obj_contributor.name,
+        link: obj_contributor.url
     });
-    feed.addCategory('Forum');
+    feed.addCategory('Blog');
 
     function parseDate(jandan_datestring) {
         let _arr_date = [];
@@ -169,7 +180,7 @@ function buildFeed() {
         // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date
     }
 
-    function jandanAuthorURLHelper(url) {
+    function jandanAuthorURLHelper(url) {  // output absolute author URL
 	    if (url.indexOf('/author/') == 0 ) {
 		    url = 'http://jandan.net' + url
 	    }
@@ -182,7 +193,7 @@ function buildFeed() {
             id: e.url,
             link: e.url,
             description: '煎蛋最热文章 - ' + _date_generate,
-            content: e.content + xml_entry_footer,
+            content: e.content + xml_entry_footer, // feed contributor footer
             author: [{
                 name: e.author_name,
                 link: jandanAuthorURLHelper(e.author_url)
@@ -259,6 +270,11 @@ var getArticleJSON = function(given_index, callback) {
                 }
             }
 
+		function getExceedLengthWarning(url) {
+			return '<div><a href="' + url + '">前往<img src="http://cdn.jandan.net/static/img/favicon.ico" />煎蛋&nbsp;阅读全文...</a></div>'
+		}
+
+
             let _dom_curr = {};
             let _dom_content_title = {};
             let _xml_content = '';
@@ -277,6 +293,10 @@ var getArticleJSON = function(given_index, callback) {
 
                 _dom_curr = _dom_curr.next;
             }
+
+		if (_count_content_length >= limit_article_length) {
+			_xml_content += getExceedLengthWarning(arr_feed_structure[given_index].url);
+		}
 
             _xml_content = _xml_content.replace(/data-original=/g, 'src='); // remove lazy load feature
 
