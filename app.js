@@ -27,24 +27,44 @@ var arr_feed_structure = [];
 
 // http Server
 app.get('/feed.xml', function(req, res) {
-    work_hard(function() {
-        if (feed) {
-            if (req.query.type) {
-                if (req.query.type == 'rss') {
+    let _req_output = req.query.output;
+    let _req_type = req.query.type;
+
+            if (_req_output) {
+                if (_req_output === 'rss') {
 			res.type('application/rss+xml');
-                    res.send(feed.rss2());
-                }
-                if (req.query.type == 'json') {
+                } else if (_req_output === 'json') {
 			res.type('application/json');
+                } else { // catch all bad output
+			res.type('application/atom+xml');
+                        _req_output = 'atom';
+		}
+            } else {
+			res.type('application/atom+xml');
+                        _req_output = 'atom';
+            }
+
+            if (_req_type) {
+                if (_req_type === 'hotcomments') {
+			// do nothing
+                } else if (_req_type === 'hotlike') {
+			// do nothing
+                } else { // catch all bad type
+                        _req_type = 'hotposts';
+		}
+            } else {
+                        _req_type = 'hotposts';
+            }
+
+    work_hard(_req_type, function() {
+        if (feed) {
+                if (_req_output == 'rss') {
+                    res.send(feed.rss2());
+                } else if (_req_output == 'json') {
                     res.send(feed.json1());
                 } else {
-			res.type('application/atom+xml');
                     res.send(feed.atom1());
                 }
-            } else {
-		    res.type('application/atom+xml');
-                res.send(feed.atom1());
-            }
             res.end();
         } else {
             res.send('API parse failure, please consider contact contributor: ' + obj_contributor.contact);
@@ -55,13 +75,20 @@ app.get('/feed.xml', function(req, res) {
 app.listen(3000, () => console.log('App is running...'));
 
 
-var work_hard = function(callback) {
+var work_hard = function(req_type, callback) {
+	let _obj_type_keyword = {
+		"hotposts": /%E6%AC%A1%E6%B5%8F%E8%A7%88/, //urlencoded '次浏览'
+		"hotlike": /%20\d+%E8%B5%9E/, // url encoded ' xx赞', ' xx评论'
+		"hotcomments": /%20\d+%E8%AF%84%E8%AE%BA/
+	}
+	let _reg_type_keyword = _obj_type_keyword[req_type];
+
     // parser for API's entire HTML
     let parserHTML = new htmlparser2.Parser({
         ontext: function(text) {
             let _t = '';
-            if (text.indexOf('document.write(decodeURIComponent(') !== -1) { // keyword-1
-                if (text.indexOf('%E6%AC%A1%E6%B5%8F%E8%A7%88') !== -1) { // keyword-2
+            if (text.indexOf('document.write(decodeURIComponent(') !== -1) { // keyword for jandan JSONP
+                if (_reg_type_keyword.test(text)) {
                     _t = text.trim();
                     raw_JSONP = _t;
                 }
@@ -72,6 +99,7 @@ var work_hard = function(callback) {
     });
     let _xml_feed_structure = '';
 
+    (function(req_type){
     request({
         url: api_getHotTopic,
         headers: reqHeaders
@@ -86,25 +114,31 @@ var work_hard = function(callback) {
         } else {
             parserHTML.parseComplete(data); //raw_JSONP is ready
             _xml_feed_structure = decodeURIComponent(cleanupJSONP(raw_JSONP)); // cleanup raw_JSONP
-            arr_feed_structure = getFeedStructure(_xml_feed_structure); // feed title metadata in array
+            arr_feed_structure = getFeedStructure(req_type,_xml_feed_structure); // get array of title metadata
             getFeedEntry(function () {
-                feed = buildFeed(); // feed object is ready
+                feed = buildFeed(req_type); // feed object is ready
                 callback();
 	    });
 
         }
     });
+    })(req_type); // credit to https://stackoverflow.com/a/36802485/4349454
+
 }
 
 function cleanupJSONP(data) {
     let _cleanstr = '';
-    let keyword1 = 'document.write(decodeURIComponent(\'';
-    let keyword2 = '\'));';
+    let keyword1 = 'document.write(decodeURIComponent(\''; // remove padding
+    let keyword2 = '\'));'; // remove padding
     _cleanstr = data.replace(keyword1, '').replace(keyword2, '');
     return _cleanstr;
 }
 
-function getFeedStructure(data) {
+function getFeedStructure(req_type, data) {
+    let _cleanstr = '';
+	if (req_type === 'hotposts') {
+		// layout example:
+		// <li><a href="http://jandan.net/2017/11/13/hahaha-58.html" title="11647次浏览">无聊图大吐槽</a></li>
     let re_keyword1 = /<li><a href=/gi;
     let re_keyword2 = /<\/a><\/li>/gi;
     let re_keyword3 = /title=/gi;
@@ -115,17 +149,40 @@ function getFeedStructure(data) {
     _cleanstr = _cleanstr.replace(re_keyword5, '%-%-'); // split metadata with %-%- mark
     _cleanstr = _cleanstr.replace(re_keyword4, ''); // clean up quote mark
     _cleanstr = _cleanstr.substring(1, _cleanstr.length - 1); // remove % from head and tail
+	} else {
+		// layout example:
+		// <li><a href="http://jandan.net/2017/11/13/hahaha-58.html">无聊图大吐槽</a>  64赞</li>
+    let re_keyword1 = /<li><a href=/gi;
+    let re_keyword2 = /<\/li>/gi;
+    let re_keyword3 = /<\/a>/gi;
+    let re_keyword4 = /"/gi;
+    let re_keyword5 = />/gi;
+    _cleanstr = data.replace(re_keyword1, '%').replace(re_keyword2, '%'); // clean xml tags
+    _cleanstr = _cleanstr.replace(re_keyword3, '%-%-'); // split metadata with %-%- mark
+    _cleanstr = _cleanstr.replace(re_keyword5, '%-%-'); // split metadata with %-%- mark
+    _cleanstr = _cleanstr.replace(re_keyword4, ''); // clean up quote mark
+    _cleanstr = _cleanstr.substring(1, _cleanstr.length - 1); // remove % from head and tail
+
+	}
 
     let arr_str_entry = _cleanstr.split('%%');
-    let arr_obj_header1 = ['url', 'click', 'title']; // TODO, click is useless
+    let arr_obj_header1 = [];
+
+	if (req_type === 'hotposts') { // TODO meta is useless
+    arr_obj_header1 = ['url', 'meta', 'title'];
+	} else {
+    arr_obj_header1 = ['url', 'title', 'meta'];
+	}
+
     let arr_feed_entry = [];
+
     arr_str_entry.forEach(function(e, i) {
         let _t = {};
         let _obj = {};
         e.split('%-%-').forEach(function(val, int) {
             _obj[arr_obj_header1[int]] = val.trim(); // remove tailing space in url
         });
-        _t = _obj; // fix js obj referring
+        _t = _obj; // fix javascript obj referring
         arr_feed_entry.push(_t);
 
     });
@@ -152,12 +209,21 @@ Promise.all(requests).then(() => {
 
 }
 
-function buildFeed() {
+function buildFeed(req_type) {
+	let _feed_subtitle = '';
+
+	if (req_type === 'hotposts') {
+	    _feed_subtitle = '24H热文';
+	} else if (req_type === 'hotlike') {
+	    _feed_subtitle = '三日最赞';
+	} else {
+	    _feed_subtitle = '一周话题';
+	}
 
 	data = arr_feed_structure;
     // build feed header
     let feed = new Feed({
-        title: '煎蛋 - 24H最热', // TODO
+        title: '煎蛋 - ' + _feed_subtitle,
         description: '地球上没有新鲜事 | 第三方订阅源 由jandanhot2rss强力驱动',
         id: 'http://jandan.net/',
         link: 'http://jandan.net/',
