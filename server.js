@@ -14,7 +14,7 @@ var reqHeaders = {
 };
 var api_getHotTopic = "http://jandan.net/2010/06/24/feedsky-feed.html";
 var limit_article_length = 300; // using 99999 instead, for full article in feed
-var xml_entry_footer = '<hr /><strong>使用经BSD许可证分发的<a href="https://github.com/delight09/jandanhot2rss">jandanhot2rss</a>项目生成，<a href="https://blog.djh.im/">imdjh</a>用❤支援维护</strong>'
+var xml_entry_footer = '<hr /><small style="color:#757575;">使用经BSD许可证分发的<a href="https://github.com/delight09/jandanhot2rss">jandanhot2rss</a>项目生成，<a href="https://blog.djh.im/">imdjh</a>用❤支援维护</small>'
 var obj_contributor = { "name": "delight09", "url": "https://github.com/delight09", "contact": "https://github.com/delight09/jandanhot2rss" }
 
 // global variables
